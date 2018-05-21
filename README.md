@@ -37,12 +37,12 @@ The directory structure of your new project looks like this:
 
 ```
     +-- .env               <- Environment specific details such as AWS secrets. DO NOT STORE IN GIT
-	+-- LICENSE
+    +-- LICENSE
     +-- Makefile           <- Makefile with commands like 'make train'
     +-- README.md          <- The top-level README for developers using this project.
     +-- api.py             <- A flask JSON API Server that performs predictions
-	+-- Dockerfile         <- A Dockerfile to house the project. Optional.
-	+-- environment.yml    <- An Anaconda environment file
+    +-- Dockerfile         <- A Dockerfile to house the project. Optional.
+    +-- environment.yml    <- An Anaconda environment file
     +-- data
     |   +-- external       <- Data from third party sources.
     |   +-- interim        <- Intermediate data that has been transformed.
