@@ -12,7 +12,6 @@ It's no secret that good analyses are often the result of very scattershot and s
 
 That being said, once started it is not a process that lends itself to thinking carefully about the structure of your code or project layout, so it's best to start with a clean, logical structure and stick to it throughout. We think it's a pretty big win all around to use a fairly standardized setup like this one. Here's why:
 
-
 ### Other people will thank you
 
 > Nobody sits around before creating a new Rails project to figure out where they want to put their views; they just run `rails new` to get a standard project skeleton like everybody else.
@@ -70,57 +69,59 @@ Starting a new project is as easy as running this command at the command line. N
 cookiecutter https://github.com/drivendata/cookiecutter-data-science
 ```
 
-### Example
-
-<script type="text/javascript" src="https://asciinema.org/a/9bgl5qh17wlop4xyxu9n9wr02.js" id="asciicast-9bgl5qh17wlop4xyxu9n9wr02" async></script>
-
 ## Directory structure
 
 ```nohighlight
-├── LICENSE
-├── Makefile           <- Makefile with commands like `make data` or `make train`
-├── README.md          <- The top-level README for developers using this project.
-├── data
-│   ├── external       <- Data from third party sources.
-│   ├── interim        <- Intermediate data that has been transformed.
-│   ├── processed      <- The final, canonical data sets for modeling.
-│   └── raw            <- The original, immutable data dump.
-│
-├── docs               <- A default Sphinx project; see sphinx-doc.org for details
-│
-├── models             <- Trained and serialized models, model predictions, or model summaries
-│
-├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
-│                         the creator's initials, and a short `-` delimited description, e.g.
-│                         `1.0-jqp-initial-data-exploration`.
-│
-├── references         <- Data dictionaries, manuals, and all other explanatory materials.
-│
-├── reports            <- Generated analysis as HTML, PDF, LaTeX, etc.
-│   └── figures        <- Generated graphics and figures to be used in reporting
-│
-├── requirements.txt   <- The requirements file for reproducing the analysis environment, e.g.
-│                         generated with `pip freeze > requirements.txt`
-│
-├── setup.py           <- Make this project pip installable with `pip install -e`
-├── src                <- Source code for use in this project.
-│   ├── __init__.py    <- Makes src a Python module
-│   │
-│   ├── data           <- Scripts to download or generate data
-│   │   └── make_dataset.py
-│   │
-│   ├── features       <- Scripts to turn raw data into features for modeling
-│   │   └── build_features.py
-│   │
-│   ├── models         <- Scripts to train models and then use trained models to make
-│   │   │                 predictions
-│   │   ├── predict_model.py
-│   │   └── train_model.py
-│   │
-│   └── visualization  <- Scripts to create exploratory and results oriented visualizations
-│       └── visualize.py
-│
-└── tox.ini            <- tox file with settings for running tox; see tox.testrun.org
+    +-- .env               <- Environment specific details such as AWS secrets. DO NOT STORE IN GIT
+	+-- LICENSE
+    +-- Makefile           <- Makefile with commands like 'make train'
+    +-- README.md          <- The top-level README for developers using this project.
+    +-- api.py             <- A flask JSON API Server that performs predictions
+	+-- Dockerfile         <- A Dockerfile to house the project. Optional.
+	+-- environment.yml    <- An Anaconda environment file
+    +-- data
+    |   +-- external       <- Data from third party sources.
+    |   +-- interim        <- Intermediate data that has been transformed.
+    |   +-- processed      <- The final, canonical data sets for modeling.
+    |   +-- raw            <- The original, immutable data dump.
+    |
+    +-- docs               <- A default Sphinx project; see sphinx-doc.org for details
+    |
+    +-- notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
+    |                         the creator's initials, and a short `-` delimited description, e.g.
+    |                         '1.0-jqp-initial-data-exploration'.
+    |
+    +-- references         <- Data dictionaries, manuals, and all other explanatory materials.
+    |
+    +-- results            <- Generated analysis as HTML, PDF, LaTeX, etc.
+    |   +-- reports
+    |   |  +-- figures     <- Generated graphics and figures to be used in reporting
+    |   +-- models         <- Trained and serialized models, model predictions, or model summaries
+    |
+    +-- requirements.txt   <- The requirements file for reproducing the analysis environment, e.g.
+    |                         generated with 'pip freeze > requirements.txt'
+    |
+    +-- setup.py           <- makes project pip installable (pip install -e .) so src can be imported
+    +-- src                <- Source code for use in this project.
+    |   +-- __init__.py    <- Makes src a Python module
+    |   |
+    |   +-- data           <- Scripts to download or generate data
+    |   | +-- make_dataset.py
+    |   |
+    |   +-- evaluation       <- Scripts to evaluate models, prediction outsuts, etc
+    |   | +-- evaluate.py
+    |   |
+    |   +-- features       <- Scripts to turn raw data into features for modeling
+    |   | +-- build_features.py <- Transforms a preprocessed file by adding features
+    |   |
+    |   +-- models         <- Scripts to train models and then use trained models to make predictions
+    |   | +-- predict_model.py  <- Script to generate a prediction file from an input using the model
+    |   | +-- train_model.py    <- Trains a model and saves it for reuse
+    |   +-- tests          <- Scripts to test data loading, feature transformations, models, etc
+    | +-- visualization    <- Scripts to create exploratory and results oriented visualizations
+    |     +-- visualize.py
+    |
+    +-- tox.ini            <- tox file with settings for running tox; see tox.testrun.org
 ```
 
 ## Opinions
@@ -185,14 +186,14 @@ Create a `.env` file in the project root folder. Thanks to the `.gitignore`, thi
 ```nohighlight
 # example .env file
 DATABASE_URL=postgres://username:password@localhost:5432/dbname
-AWS_ACCESS_KEY=myaccesskey
+AWS_ACCESS_KEY_ID=myaccesskey
 AWS_SECRET_ACCESS_KEY=mysecretkey
 OTHER_VARIABLE=something
 ```
 
 #### Use a package to load these variables automatically.
 
-If you look at the stub script in `src/data/make_dataset.py`, it uses a package called [python-dotenv](https://github.com/theskumar/python-dotenv) to load up all the entries in this file as environment variables so they are accessible with `os.environ.get`. Here's an example snippet adapted from the `python-dotenv` documentation:
+If you look at the stub script in `src/data/preprocess.py`, it uses a package called [python-dotenv](https://github.com/theskumar/python-dotenv) to load up all the entries in this file as environment variables so they are accessible with `os.environ.get`. Here's an example snippet adapted from the `python-dotenv` documentation:
 
 ```python
 # src/data/dotenv_example.py
@@ -208,19 +209,6 @@ load_dotenv(dotenv_path)
 database_url = os.environ.get("DATABASE_URL")
 other_variable = os.environ.get("OTHER_VARIABLE")
 ```
-
-#### AWS CLI configuration
-When using Amazon S3 to store data, a simple method of managing AWS access is to set your access keys to environment variables. However, managing mutiple sets of keys on a single machine (e.g. when working on multiple projects) it is best to use a [credentials file](https://docs.aws.amazon.com/cli/latest/userguide/cli-config-files.html), typically located in `~/.aws/credentials`. A typical file might look like:
-```
-[default]
-aws_access_key_id=myaccesskey
-aws_secret_access_key=mysecretkey
-
-[another_project]
-aws_access_key_id=myprojectaccesskey
-aws_secret_access_key=myprojectsecretkey
-```
-You can add the profile name when initialising a project; assuming no applicable environment variables are set, the profile credentials will be used be default.
 
 ### Be conservative in changing the default folder structure
 

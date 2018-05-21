@@ -1,6 +1,7 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+*$py.class
 
 # C extensions
 *.so
@@ -19,6 +20,7 @@ lib64/
 parts/
 sdist/
 var/
+wheels/
 *.egg-info/
 .installed.cfg
 *.egg
@@ -41,7 +43,8 @@ htmlcov/
 .cache
 nosetests.xml
 coverage.xml
-*,cover
+*.cover
+.hypothesis/
 
 # Translations
 *.mo
@@ -49,6 +52,14 @@ coverage.xml
 
 # Django stuff:
 *.log
+local_settings.py
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
 
 # Sphinx documentation
 docs/_build/
@@ -56,27 +67,35 @@ docs/_build/
 # PyBuilder
 target/
 
-# DotEnv configuration
+# pyenv
+.python-version
+
+# dotenv
 .env
+
+# virtualenv
+.venv
+venv/
+ENV/
 
 # Database
 *.db
 *.rdb
 
-# Pycharm
+# Pycharm / IntelliJ
 .idea
+.idea/
+*.iml
 
 # VS Code
 .vscode/
-
-# Spyder
-.spyproject/
 
 # Jupyter NB Checkpoints
 .ipynb_checkpoints/
 
 # exclude data from source control by default
 /data/
+!./data/raw/.gitkeep
 
 # Mac OS-specific storage files
 .DS_Store

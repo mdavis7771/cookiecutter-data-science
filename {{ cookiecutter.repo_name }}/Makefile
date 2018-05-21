@@ -1,14 +1,26 @@
-.PHONY: clean data lint requirements sync_data_to_s3 sync_data_from_s3
+.PHONY: clean download preprocess train evaluate visualize lint requirements sync_data_to_s3 sync_data_from_s3
 
 #################################################################################
 # GLOBALS                                                                       #
 #################################################################################
-
 PROJECT_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+DATA_RAW_URL = "https://archive.ics.uci.edu/ml/machine-learning-databases/iris/iris.data"
+DATA_RAW_FILENAME = "data/raw/data.csv"
+DATA_PREPROCESSED_FILENAME = "data/processed/processed.pkl"
+DATA_FEATUREVECTOR_FILENAME = "data/interim/feature_vector.pkl"
+MODEL_FILENAME = "results/models/output.model"
+TRAIN_FILE = "data/interim/train.pkl"
+TEST_FILE = "data/interim/test.pkl"
+EVAL_FILENAME = "results/reports/eval.csv"
+FIGURES_FOLDER = "results/reports/figures"
 BUCKET = {{ cookiecutter.s3_bucket }}
-PROFILE = {{ cookiecutter.aws_profile }}
 PROJECT_NAME = {{ cookiecutter.repo_name }}
 PYTHON_INTERPRETER = {{ cookiecutter.python_interpreter }}
+ENFILE = .env
+
+# This reads our.env file and preserves and overwrites from command line
+export $(shell [ ! -n "$(ENVFILE)" ] || cat $(ENVFILE) | grep -v \
+    --perl-regexp '^('$$(env | sed 's/=.*//'g | tr '\n' '|')')\=')
 
 ifeq (,$(shell which conda))
 HAS_CONDA=False
@@ -20,19 +32,68 @@ endif
 # COMMANDS                                                                      #
 #################################################################################
 
+## Download, preprocess, featurize, split, train, evaluate
+all: $(DATA_RAW_FILENAME) $(DATA_PREPROCESSED_FILENAME) $(DATA_FEATUREVECTOR_FILENAME) $(MODEL_FILENAME) $(TRAIN_FILE) $(TEST_FILE) $(EVAL_FILENAME)
+
 ## Install Python Dependencies
 requirements: test_environment
 	pip install -U pip setuptools wheel
 	pip install -r requirements.txt
 
-## Make Dataset
-data: requirements
-	$(PYTHON_INTERPRETER) src/data/make_dataset.py
+$(DATA_RAW_FILENAME):
+	$(PYTHON_INTERPRETER) src/data/download.py $(DATA_RAW_URL) $@
+
+## Download raw Data from $(DATA_RAW_URL)
+download: $(DATA_RAW_FILENAME)
+
+$(DATA_PREPROCESSED_FILENAME): $(DATA_RAW_FILENAME)
+	$(PYTHON_INTERPRETER) src/data/preprocess.py $< $@
+
+## Preprocess the data
+preprocess: $(DATA_PREPROCESSED_FILENAME)
+
+build_features $(DATA_FEATUREVECTOR_FILENAME): $(DATA_PREPROCESSED_FILENAME)
+	$(PYTHON_INTERPRETER) src/features/build_features.py $< $@
+
+## Build Feature Vector from Preprocessed file
+build_features: $(DATA_FEATUREVECTOR_FILENAME)
+
+$(TRAIN_FILE): $(DATA_FEATUREVECTOR_FILENAME)
+	$(PYTHON_INTERPRETER) src/data/train_test_split.py $(DATA_FEATUREVECTOR_FILENAME) $(TRAIN_FILE) $(TEST_FILE)
+
+$(TEST_FILE): $(DATA_FEATUREVECTOR_FILENAME)
+	$(PYTHON_INTERPRETER) src/data/train_test_split.py $(DATA_FEATUREVECTOR_FILENAME) $(TRAIN_FILE) $(TEST_FILE)
+
+## Split feature vector file into train and test files
+split: $(TRAIN_FILE)
+
+$(MODEL_FILENAME): split
+	$(PYTHON_INTERPRETER) src/models/train_model.py $(TRAIN_FILE) $@
+
+## Train the model and output a model file.
+train: $(MODEL_FILENAME)
+
+$(EVAL_FILENAME): $(MODEL_FILENAME)
+	$(PYTHON_INTERPRETER) src/evaluation/evaluate.py $(MODEL_FILENAME) $(TEST_FILE) $@
+
+## Evaluate the model using test and output evaluation metrics
+eval: $(EVAL_FILENAME)
+
+## Generate Figures from the evaluation file
+visualize: $(EVAL_FILENAME)
+	$(PYTHON_INTERPRETER) src/visualize/visualize.py $(EVAL_FILENAME) $(FIGURES_FOLDER)
 
 ## Delete all compiled Python files
 clean:
 	find . -type f -name "*.py[co]" -delete
 	find . -type d -name "__pycache__" -delete
+	rm -f data/raw/*.*
+	rm -f data/processed/*.*
+	rm -f data/interim/*.*
+	rm -f data/external/*.*
+	rm -f results/reports/*.*
+	rm -f results/reports/figures/*.*
+	rm -f results/models/*.*
 
 ## Lint using flake8
 lint:
@@ -40,28 +101,20 @@ lint:
 
 ## Upload Data to S3
 sync_data_to_s3:
-ifeq (default,$(PROFILE))
 	aws s3 sync data/ s3://$(BUCKET)/data/
-else
-	aws s3 sync data/ s3://$(BUCKET)/data/ --profile $(PROFILE)
-endif
 
-## Download Data from S3
+## Download Data from S3 - Should be used when sharing a specific versioned run and not starting from scratch
 sync_data_from_s3:
-ifeq (default,$(PROFILE))
 	aws s3 sync s3://$(BUCKET)/data/ data/
-else
-	aws s3 sync s3://$(BUCKET)/data/ data/ --profile $(PROFILE)
-endif
 
 ## Set up python interpreter environment
 create_environment:
 ifeq (True,$(HAS_CONDA))
 		@echo ">>> Detected conda, creating conda environment."
 ifeq (3,$(findstring 3,$(PYTHON_INTERPRETER)))
-	conda create --name $(PROJECT_NAME) python=3
+	conda create --name $(PROJECT_NAME) -f environment.yml python=3
 else
-	conda create --name $(PROJECT_NAME) python=2.7
+	conda create --name $(PROJECT_NAME) -f environment.yml python=2.7
 endif
 		@echo ">>> New conda env created. Activate with:\nsource activate $(PROJECT_NAME)"
 else
@@ -104,41 +157,27 @@ test_environment:
 # Separate expressions are necessary because labels cannot be delimited by
 # semicolon; see <http://stackoverflow.com/a/11799865/1968>
 .PHONY: show-help
+
+# COLORS
+GREEN  := $(shell tput -Txterm setaf 2)
+YELLOW := $(shell tput -Txterm setaf 3)
+WHITE  := $(shell tput -Txterm setaf 7)
+RESET  := $(shell tput -Txterm sgr0)
+
+
+TARGET_MAX_CHAR_NUM=20
 show-help:
-	@echo "$$(tput bold)Available rules:$$(tput sgr0)"
-	@echo
-	@sed -n -e "/^## / { \
-		h; \
-		s/.*//; \
-		:doc" \
-		-e "H; \
-		n; \
-		s/^## //; \
-		t doc" \
-		-e "s/:.*//; \
-		G; \
-		s/\\n## /---/; \
-		s/\\n/ /g; \
-		p; \
-	}" ${MAKEFILE_LIST} \
-	| LC_ALL='C' sort --ignore-case \
-	| awk -F '---' \
-		-v ncol=$$(tput cols) \
-		-v indent=19 \
-		-v col_on="$$(tput setaf 6)" \
-		-v col_off="$$(tput sgr0)" \
-	'{ \
-		printf "%s%*s%s ", col_on, -indent, $$1, col_off; \
-		n = split($$2, words, " "); \
-		line_length = ncol - indent; \
-		for (i = 1; i <= n; i++) { \
-			line_length -= length(words[i]) + 1; \
-			if (line_length <= 0) { \
-				line_length = ncol - indent - length(words[i]) - 1; \
-				printf "\n%*s ", -indent, " "; \
-			} \
-			printf "%s ", words[i]; \
+	@echo ''
+	@echo 'Usage:'
+	@echo '  ${YELLOW}make${RESET} ${GREEN}<target>${RESET}'
+	@echo ''
+	@echo 'Targets:'
+	@awk '/^[a-zA-Z\-\_0-9]+:/ { \
+		helpMessage = match(lastLine, /^## (.*)/); \
+		if (helpMessage) { \
+			helpCommand = substr($$1, 0, index($$1, ":")-1); \
+			helpMessage = substr(lastLine, RSTART + 3, RLENGTH); \
+			printf "  ${YELLOW}%-$(TARGET_MAX_CHAR_NUM)s${RESET} ${GREEN}%s${RESET}\n", helpCommand, helpMessage; \
 		} \
-		printf "\n"; \
-	}' \
-	| more $(shell test $(shell uname) = Darwin && echo '--no-init --raw-control-chars')
+	} \
+	{ lastLine = $$0 }' $(MAKEFILE_LIST)
