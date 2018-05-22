@@ -72,7 +72,6 @@ setup(
         "tqdm",
         "sumatra",
         "boto3",
-        "urlparse",
         "botocore",
         "flask_restful"
     ],
