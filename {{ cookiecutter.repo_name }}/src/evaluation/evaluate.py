@@ -1,32 +1,40 @@
 # -*- coding: utf-8 -*-
 import sys
 import click
-import pandas as pd
 from dotenv import find_dotenv, load_dotenv
 from sklearn.metrics import accuracy_score, precision_score, recall_score
-from src.utils import config_logging, time_func
+from src.utils import config_logging, log_func, time_func
 import logging
 from src.features.build_features import get_features, get_label, read_feature_vector
 from src.models.random_forest import RandomForestModel
-
+import pandas as pd
 
 @time_func
-def predict(model, dframe):
+def cv_evaluate_model(model, dframe):
     X = get_features(dframe)
+    y = get_label(dframe)
 
-    pred_df = pd.DataFrame(index=X.index.values, columns=['probability', 'prediction'])
-    pred_df.index.name = 'index'
-    pred_df['probability'] = model.predict_proba(X)
-    pred_df['prediction'] = model.predict(X)
+    predictions = model.predict(X)
 
-    return pred_df
+    accuracy = accuracy_score(y, predictions)
+    precision = precision_score(y, predictions, average='macro')
+    recall = recall_score(y, predictions, average='macro')
+
+    results = {
+        'params': str(model.get_params()),
+        'model': model.name,
+        'accuracy': accuracy,
+        'precision': precision,
+        'recall': recall,
+    }
+    return pd.DataFrame(data=results, index=[0])
 
 
 @click.command()
 @click.argument('model_file', type=click.Path(exists=True, readable=True, dir_okay=False))
 @click.argument('test_file', type=click.Path(writable=True, dir_okay=False))
-@click.argument('predictions_file', type=click.Path(writable=True, dir_okay=False))
-def predict_model(model_file, test_file, predictions_file):
+@click.argument('eval_file', type=click.Path(writable=True, dir_okay=False))
+def evaluate(model_file, test_file, eval_file):
     """ Evaluates a model using a specific test file. The Test file must be preprocessed and featurized
 
         :param model_file: File path to model
@@ -35,12 +43,15 @@ def predict_model(model_file, test_file, predictions_file):
         :param test_file: Filename of the pickeled feature vector test file.
         :type test_file: str
 
-        :param predictions_file: Filename where the predictions will be saved to in CSV format.
-        :type predictions_file: str
+        :param eval_file: Filename where evaluation results will be saved in CSV format.
+        :type eval_file: str
+
+        :return: True if successful otherwise False
+        :rtype: bool
     """
     logger = logging.getLogger(__name__)
 
-    data = read_feature_vector(test_file, with_label=False)
+    data = read_feature_vector(test_file)
     model = RandomForestModel()
     model.load(model_file)
 
@@ -48,7 +59,7 @@ def predict_model(model_file, test_file, predictions_file):
         logger.info("Unable to load model from {}". format(model_file))
         return False
 
-    predict(model, data).to_csv(predictions_file, header=True)
+    cv_evaluate_model(model, data).to_csv(eval_file, header=True, index=False)
 
     return True
 
@@ -60,5 +71,5 @@ if __name__ == '__main__':
     # load up the .env entries as environment variables
     load_dotenv(find_dotenv())
 
-    if not predict_model(sys.argv[1:]):
+    if not evaluate(sys.argv[1:]):
         sys.exit(1)
